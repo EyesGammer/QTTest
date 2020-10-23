@@ -35,11 +35,13 @@ private slots:
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     Ui::MainWindow *ui;
     QGraphicsScene *scene;
     QGraphicsRectItem *rectangle;
     QColor m_color;
+    int sizeX, sizeY;
 };
 #endif // MAINWINDOW_H

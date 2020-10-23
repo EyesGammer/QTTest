@@ -1,4 +1,7 @@
+#include <QDebug>
+
 #include <QPalette>
+#include <QGraphicsSceneMouseEvent>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -7,12 +10,14 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    sizeX = 100;
+    sizeY = 100;
     ui->setupUi(this);
     scene = new QGraphicsScene(this);
+    scene->installEventFilter(this);
     ui->graphicsView->setScene(scene);
     ui->graphicsView->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-    this->installEventFilter(ui->graphicsView);
-    ui->graphicsView->setMouseTracking(true);
+    ui->graphicsView->setMouseTracking(false);
     connect(ui->redSlider, SIGNAL(valueChanged(int)), SLOT(onColorChanged()));
     connect(ui->blueSlider, SIGNAL(valueChanged(int)), SLOT(onColorChanged()));
     connect(ui->greenSlider, SIGNAL(valueChanged(int)), SLOT(onColorChanged()));
@@ -20,9 +25,9 @@ MainWindow::MainWindow(QWidget *parent)
     QBrush whiteBrush(Qt::white);
     QPen outlinePen(Qt::black);
     outlinePen.setWidth(1);
-    for(int y = 0; y < ui->graphicsView->width() - 5; y += 32){
-        for(int x = 0; x < ui->graphicsView->width() - 5; x += 32){
-            rectangle = scene->addRect(x, y, 32, 32, outlinePen, whiteBrush);
+    for(int y = 0; y < ui->graphicsView->height() - (int)(ui->graphicsView->height() % sizeY); y += (int)(ui->graphicsView->height() / sizeY)){
+        for(int x = 0; x < ui->graphicsView->width() - (int)(ui->graphicsView->height() % sizeY); x += (int)(ui->graphicsView->width() / sizeX)){
+            rectangle = scene->addRect(x, y, (int)(ui->graphicsView->width() / sizeX), (int)(ui->graphicsView->height() / sizeY), outlinePen, whiteBrush);
         }
     }
 }
@@ -30,6 +35,36 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if(watched == scene){
+        QGraphicsSceneMouseEvent *mouseSceneEvent;
+        if(event->type() == QEvent::GraphicsSceneMouseMove){
+            mouseSceneEvent = static_cast<QGraphicsSceneMouseEvent *>(event);
+            QPoint clicked;
+            QPoint pt = {(int)mouseSceneEvent->scenePos().x(), (int)mouseSceneEvent->scenePos().y()};
+            QBrush whiteBrush(Qt::white);
+            QBrush personalBrush(m_color);
+            QPen outlinePen(Qt::black);
+            outlinePen.setWidth(1);
+            if(mouseSceneEvent->buttons() == Qt::LeftButton){
+                if(checkPosInGraphicsView(&pt)){
+                    clicked = checkInnerRect(&pt);
+                    if(!(clicked == (QPoint){-1, -1})){
+                        rectangle = scene->addRect(clicked.x() * (int)(ui->graphicsView->width() / sizeX), clicked.y() * (int)(ui->graphicsView->height() / sizeY), (int)(ui->graphicsView->width() / sizeX), (int)(ui->graphicsView->height() / sizeY), outlinePen, personalBrush);
+                    }
+                }
+            }else if(mouseSceneEvent->buttons() == Qt::RightButton){
+                if(checkPosInGraphicsView(&pt)){
+                    clicked = checkInnerRect(&pt);
+                    rectangle = scene->addRect(clicked.x() * (int)(ui->graphicsView->width() / sizeX), clicked.y() * (int)(ui->graphicsView->height() / sizeY), (int)(ui->graphicsView->width() / sizeX), (int)(ui->graphicsView->height() / sizeY), outlinePen, whiteBrush);
+                }
+            }
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event)
@@ -43,14 +78,14 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
     if(event->button() == Qt::LeftButton){
         if(checkPosInGraphicsView(&pt)){
             clicked = checkInnerRect(&pt);
-            if(!(clicked.isNull())){
-                rectangle = scene->addRect(clicked.x() * 32, clicked.y() * 32, 32, 32, outlinePen, personalBrush);
+            if(!(clicked == (QPoint){-1, -1})){
+                rectangle = scene->addRect(clicked.x() * (int)(ui->graphicsView->width() / sizeX), clicked.y() * (int)(ui->graphicsView->height() / sizeY), (int)(ui->graphicsView->width() / sizeX), (int)(ui->graphicsView->height() / sizeY), outlinePen, personalBrush);
             }
         }
     }else if(event->button() == Qt::RightButton){
         if(checkPosInGraphicsView(&pt)){
             clicked = checkInnerRect(&pt);
-            rectangle = scene->addRect(clicked.x() * 32, clicked.y() * 32, 32, 32, outlinePen, whiteBrush);
+            rectangle = scene->addRect(clicked.x() * (int)(ui->graphicsView->width() / sizeX), clicked.y() * (int)(ui->graphicsView->height() / sizeY), (int)(ui->graphicsView->width() / sizeX), (int)(ui->graphicsView->height() / sizeY), outlinePen, whiteBrush);
         }
     }
 }
@@ -66,12 +101,12 @@ bool MainWindow::checkPosInGraphicsView(QPoint *point)
 
 QPoint MainWindow::checkInnerRect(QPoint *point)
 {
-    QPoint clicked;
+    QPoint clicked = {-1, -1};
     int countX, countY = 0;
-    for(int y = 0; y < ui->graphicsView->height() - 5 + 32; y += 32){
+    for(int y = 0; y < ui->graphicsView->height() - (int)(ui->graphicsView->height() % sizeY); y += (int)(ui->graphicsView->height() / sizeY)){
         countX = 0;
-        for(int x = 0; x < ui->graphicsView->width() - 5; x += 32){
-            if(point->x() > x && point->x() < x + 32 && point->y() > y && point->y() < y + 32){
+        for(int x = 0; x < ui->graphicsView->width() - (int)(ui->graphicsView->height() % sizeY); x += (int)(ui->graphicsView->width() / sizeX)){
+            if(point->x() > x && point->x() < x + (int)(ui->graphicsView->width() / sizeX) && point->y() > y && point->y() < y + (int)(ui->graphicsView->height() / sizeY)){
                 clicked = {countX, countY};
             }
             countX++;
